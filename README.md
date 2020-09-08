@@ -1,6 +1,9 @@
-# 6ull_qd
+# 6ull_dev_led
 
 开始编写6ull这款正点原子的板驱动学习
+LED 驱动
+
+
 在 Linux 内核文件 include/linux/fs.h 中
 有个叫做 file_operations 的结构体，此结构体就是 Linux 内核驱动操作函数集合
 
