@@ -1,7 +1,7 @@
 /*
  * @Author: hongxing.wu
  * @Date: 2020-09-08 15:17:59
- * @LastEditTime: 2020-09-08 18:14:45
+ * @LastEditTime: 2020-09-09 11:14:30
  * @LastEditors: Please set LastEditors
  * @Description: In User Settings Edit
  * @FilePath: \6ull_dev_led\char_dev_led.c
@@ -22,6 +22,9 @@
 
 #define LED_DEV_MAJOR    200    /*主设备号*/
 #define LED_DEV_NAME     "ldedev"
+
+#define LED_OFF         0
+#define LED_ON          1
 
 
 /* 寄存器物理地址 */
@@ -46,6 +49,28 @@ static char writebuf[100];
 static char kerneldata[] = {"kernel data!"};
 
 
+
+
+void led_switch(u8 sta)
+{
+    u32 val = 0;
+    if(sta == LED_ON){
+        val = readl(GPIO1_DR);
+        val &= ~(1<<3);
+        writel = (val, GPIO1_DR);
+    }else{
+        val = readl(GPIO1_DR);
+        val |= (1<<3);
+        writel = (val, GPIO1_DR);
+    }
+}
+
+
+
+
+
+
+
 /*
 *打开设备DSF
 * inode : 传递给驱动的 inode
@@ -67,18 +92,7 @@ static int devLed_open(struct inode *inode,struct file *filp)
 */
 static ssizet_t devLed_read(struct file *filp, char __user *buf, size_t cnt, lofft *offt)
 {
-    int retvalue = 0;
-    memcpy(readbuf,kerneldata,sizeof(kerneldata));
-    retvalue = copy_to_user(buf, readbuf, cnt);
-    if(retvalue == 0)
-    {
-        printk("kernel senddata ok \r\n");
-    }
-    else
-    {
-        printk("kernel send data failed \r\n");
-    }
-    
+    printk("kernel senddata ok \r\n");
     return 0;
 }
 
@@ -93,15 +107,17 @@ static ssizet_t devLed_read(struct file *filp, char __user *buf, size_t cnt, lof
 static ssize_t devLed_writh(struct file *filp, const char __user *buf, size_t cnt, loff_t *offt)
 {
     int ret = 0;
-    ret = copy_from_user(writebuf, buf, cnt);
+    unsigned char databuf[1];
+    unsigned char ledstat;
+
+    ret = copy_from_user(databuf, buf, cnt);
     if(ret == 0)
     {
-        printk("kernel recev deat: %s \r\n", writebuf);
+        printk("kernel recev deat \r\n");
+        return -EFAULT;
     }
-    else
-    {
-        printk("kernel recev data failed \r\n");
-    }
+    ledstat = databuf[1];
+    led_switch(ledstat);
     return 0;
 }
 
@@ -119,7 +135,7 @@ static int devLed_release(struct inode *inode, struct file *file)
 /*
 *设备操作函数结构体
 */
-static struct file_operations chrdevbase_fops = {
+static struct file_operations devLed_fops = {
     .owner = THIS_MODULE,
     .open = devLed_open,
     .read = devLed_read,
@@ -164,7 +180,7 @@ static int __init devLed_init(void)
     val |= (1 << 3);
     writel(val, GPIO1_DR);
 
-    ret = register_chrdev(LED_DEV_MAJOR, LED_DEV_NAME, &chrdevbase_fops);
+    ret = register_chrdev(LED_DEV_MAJOR, LED_DEV_NAME, &devLed_fops);
     if(retvalue < 0){
         printk("led driver register failed\r\n");
         return -EIO;
@@ -178,13 +194,19 @@ static void __exit devLed_exit(void)
     /*
     *注销字符设备驱动
     */
-   unregister_chardev(CHRDEVBASE_MAJOR,CHRDEVBASE_NAME);
-   printk("chardevbase_exit() \r\n")
+   iounmap(IMX6U_CCM_CCGR1);
+   iounmap(SW_MUX_GPIO1_IO03);
+   iounmap(SW_PAD_GPIO1_IO03);
+   iounmap(GPIO1_DR);
+   iounmap(GPIO1_GDIR);
+
+   unregister_chardev(LED_DEV_MAJOR,LED_DEV_NAME);
+   printk("led exit() \r\n")
 }
 
 
-module_init(chrdevbase_init);
-module_exit(chrdevbase_exit);
+module_init(devLed_init);
+module_exit(devLed_exit);
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("wuhongxing");
